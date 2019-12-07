@@ -25,19 +25,17 @@ public class RImageView extends ImageView {
         mHelper = new RImageViewHelper(context, this, attrs);
     }
 
-
     @Override
     protected void onDraw(Canvas canvas) {
-        if (mHelper.isNormal()) {
-            super.onDraw(canvas);
-        } else {
+        if (!mHelper.isNormal() && getVisibility() == VISIBLE) {
             mHelper.onDraw(canvas);
+        } else {
+            super.onDraw(canvas);
         }
     }
 
     public RImageViewHelper getHelper() {
         return mHelper;
     }
-
 
 }

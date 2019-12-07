@@ -8,8 +8,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingBottom="16dp"
-        android:paddingTop="16dp">
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp">
 
 
         <LinearLayout
@@ -21,6 +21,7 @@
             <com.ruffian.library.widget.RImageView
                 android:layout_width="100dp"
                 android:layout_height="100dp"
+                android:scaleType="center"
                 app:icon_src_normal="@mipmap/icon_man"
                 app:is_circle="true" />
 
@@ -28,6 +29,7 @@
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:layout_marginLeft="10dp"
+                android:scaleType="fitXY"
                 app:border_color="@color/colorAccent"
                 app:border_width="2dp"
                 app:icon_src_normal="@mipmap/icon_man"
@@ -45,13 +47,16 @@
             <com.ruffian.library.widget.RImageView
                 android:layout_width="100dp"
                 android:layout_height="100dp"
+                android:scaleType="fitStart"
                 app:corner_radius="10dp"
                 app:icon_src_normal="@mipmap/icon_man" />
 
             <com.ruffian.library.widget.RImageView
+                android:id="@+id/image"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:layout_marginLeft="12dp"
+                android:scaleType="centerCrop"
                 app:border_color="@color/colorAccent"
                 app:border_width="2dp"
                 app:corner_radius="10dp"
@@ -71,6 +76,7 @@
             <com.ruffian.library.widget.RImageView
                 android:layout_width="100dp"
                 android:layout_height="100dp"
+                android:scaleType="fitCenter"
                 app:border_color="@color/colorAccent"
                 app:border_width="0dp"
                 app:corner_radius_bottom_left="10dp"
@@ -81,6 +87,7 @@
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:layout_marginLeft="16dp"
+                android:scaleType="centerInside"
                 app:border_color="@color/colorAccent"
                 app:border_width="0dp"
                 app:corner_radius_bottom_right="10dp"
@@ -91,6 +98,7 @@
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:layout_marginLeft="16dp"
+                android:scaleType="fitEnd"
                 app:border_color="@color/colorAccent"
                 app:border_width="0dp"
                 app:corner_radius_bottom_right="20dp"
@@ -107,6 +115,7 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="16dp"
             android:clickable="true"
+            android:scaleType="matrix"
             app:corner_radius="10dp"
             app:icon_src_normal="@mipmap/icon_man"
             app:icon_src_pressed="@mipmap/icon_man_pressed"

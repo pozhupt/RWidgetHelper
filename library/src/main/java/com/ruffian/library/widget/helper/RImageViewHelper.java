@@ -3,14 +3,14 @@ package com.ruffian.library.widget.helper;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.StateListDrawable;
 import android.os.Build;
@@ -32,6 +32,7 @@ public class RImageViewHelper {
     private Drawable mIconNormal;
     private Drawable mIconPressed;
     private Drawable mIconUnable;
+    private Drawable mIconSelected;
 
     //圆角
     private float mCorner = -1;
@@ -56,12 +57,13 @@ public class RImageViewHelper {
     private final RectF mBorderRect = new RectF();
     private Paint mBitmapPaint;
     private Paint mBorderPaint;
-
+    private Path mBitmapPath;
 
     protected int[][] states = new int[4][];
     private StateListDrawable mStateDrawable;
 
     private ImageView mView;
+    private BitmapShader mBitmapShader;
 
     public RImageViewHelper(Context context, ImageView view, AttributeSet attrs) {
         mView = view;
@@ -86,10 +88,12 @@ public class RImageViewHelper {
             mIconNormal = a.getDrawable(R.styleable.RImageView_icon_src_normal);
             mIconPressed = a.getDrawable(R.styleable.RImageView_icon_src_pressed);
             mIconUnable = a.getDrawable(R.styleable.RImageView_icon_src_unable);
+            mIconSelected = a.getDrawable(R.styleable.RImageView_icon_src_selected);
         } else {
             int normalId = a.getResourceId(R.styleable.RImageView_icon_src_normal, -1);
             int pressedId = a.getResourceId(R.styleable.RImageView_icon_src_pressed, -1);
             int unableId = a.getResourceId(R.styleable.RImageView_icon_src_unable, -1);
+            int selectedId = a.getResourceId(R.styleable.RImageView_icon_src_selected, -1);
 
             if (normalId != -1)
                 mIconNormal = AppCompatResources.getDrawable(context, normalId);
@@ -97,6 +101,8 @@ public class RImageViewHelper {
                 mIconPressed = AppCompatResources.getDrawable(context, pressedId);
             if (unableId != -1)
                 mIconUnable = AppCompatResources.getDrawable(context, unableId);
+            if (selectedId != -1)
+                mIconSelected = AppCompatResources.getDrawable(context, selectedId);
         }
         //基础属性
         mIsCircle = a.getBoolean(R.styleable.RImageView_is_circle, false);
@@ -125,7 +131,6 @@ public class RImageViewHelper {
      * 设置
      */
     private void setup() {
-
         mStateDrawable = new StateListDrawable();
 
         /**
@@ -137,16 +142,20 @@ public class RImageViewHelper {
         if (mIconUnable == null) {
             mIconUnable = mIconNormal;
         }
+        if (mIconSelected == null) {
+            mIconSelected = mIconNormal;
+        }
 
-        //pressed, focused, normal, unable
-        states[0] = new int[]{android.R.attr.state_enabled, android.R.attr.state_pressed};
-        states[1] = new int[]{android.R.attr.state_enabled, android.R.attr.state_focused};
-        states[3] = new int[]{-android.R.attr.state_enabled};
-        states[2] = new int[]{android.R.attr.state_enabled};
-        mStateDrawable.addState(states[0], mIconPressed);
+        //unable,focused,pressed,selected,normal
+        states[0] = new int[]{-android.R.attr.state_enabled};//unable
+        states[1] = new int[]{android.R.attr.state_pressed};//pressed
+        states[2] = new int[]{android.R.attr.state_selected};//selected
+        states[3] = new int[]{android.R.attr.state_enabled};//normal
+
+        mStateDrawable.addState(states[0], mIconUnable);
         mStateDrawable.addState(states[1], mIconPressed);
-        mStateDrawable.addState(states[3], mIconUnable);
-        mStateDrawable.addState(states[2], mIconNormal);
+        mStateDrawable.addState(states[2], mIconSelected);
+        mStateDrawable.addState(states[3], mIconNormal);
 
         setIcon();
     }
@@ -165,7 +174,6 @@ public class RImageViewHelper {
             mIsNormal = false;
         }
 
-
         //border
         if (mBorderPaint == null) {
             mBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -175,25 +183,9 @@ public class RImageViewHelper {
         if (mBitmapPaint == null) {
             mBitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         }
-
-        //圆形imageView强制设置类型
-        if (!mIsNormal) {
-            //border
-          /*  if (mBorderPaint == null) {
-                mBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            }
-            mBorderPaint.setStyle(Paint.Style.STROKE);
-            //bitmap
-            if (mBitmapPaint == null) {
-                mBitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            }*/
-
-            //setLayerType(View.LAYER_TYPE_SOFTWARE, mBitmapPaint);//禁止硬件加速
-            /*if (mIsCircle) {
-                super.setScaleType(ScaleType.CENTER_CROP);
-            } else {
-                super.setScaleType(getScaleType());
-            }*/
+        //BitmapPath
+        if (mBitmapPath == null) {
+            mBitmapPath = new Path();
         }
     }
 
@@ -207,6 +199,7 @@ public class RImageViewHelper {
          * 绘制图片
          */
         drawBitmap(canvas);
+
         /**
          * 绘制边框
          */
@@ -219,49 +212,60 @@ public class RImageViewHelper {
      * @param canvas
      */
     private void drawBitmap(Canvas canvas) {
-        if (mView.getDrawable() != null) {
-            //setLayerType(View.LAYER_TYPE_SOFTWARE, mBitmapPaint);//禁止硬件加速
-            int layerId = canvas.saveLayer(0, 0, getWidth(), getHeight(), mBitmapPaint, Canvas.ALL_SAVE_FLAG);//离屏绘制
 
-            //drawable
-            Drawable drawable = mView.getDrawable();
-            int bmpW = drawable.getIntrinsicWidth();
-            int bmpH = drawable.getIntrinsicHeight();
-            //matrix
-            Matrix matrix = mView.getMatrix();
-            //ScaleType
-            ImageView.ScaleType scaleType = mView.getScaleType();
+        //drawable
+        Drawable drawable = mView.getDrawable();
+        if (drawable == null) return;
 
-            //图形轮廓
-            Bitmap dst = makeDst(getWidth(), getHeight());//创建
-            canvas.drawBitmap(dst, 0, 0, mBitmapPaint);//绘制
+        //drawable' width & height
+        int bmpW = drawable.getIntrinsicWidth();
+        int bmpH = drawable.getIntrinsicHeight();
 
-            //设置混合模型
-            mBitmapPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        //ScaleType
+        ImageView.ScaleType scaleType = mView.getScaleType();
 
-            //绘制展示图
-            drawBitmapSrc(canvas, drawable, matrix, scaleType, bmpW, bmpH, getWidth(), getHeight());
+        //获取bitmap,处理ScaleType
+        Bitmap bitmap = getBitmapFromDrawable(drawable, scaleType, bmpW, bmpH, getWidth(), getHeight());
 
-            mBitmapPaint.setXfermode(null);
-            canvas.restoreToCount(layerId); //离屏绘制
+        //根据 bitmap 创建 BitmapShader
+        mBitmapShader = new BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+
+        // 设置变换矩阵
+        //mBitmapShader.setLocalMatrix(matrix);
+
+        // Paint 设置 Shader
+        mBitmapPaint.setShader(mBitmapShader);
+
+        //更新各个圆角,根据圆角路径绘制形状
+        updateCornerBitmapRadii();
+        updateDrawableAndBorderRect();
+
+        if (mIsCircle) {//圆形
+            canvas.drawCircle(getWidth() / 2f, getHeight() / 2f, Math.min(mDrawableRect.width() / 2, mDrawableRect.width() / 2), mBitmapPaint);
+        } else {//圆角
+            mBitmapPath.reset();//must重置
+            mBitmapPath.addRoundRect(mDrawableRect, mCornerBitmapRadii, Path.Direction.CCW);
+            canvas.drawPath(mBitmapPath, mBitmapPaint);
         }
     }
 
-
     /**
-     * 绘制图片
-     * 参考源码 configureBounds()
+     * 获取bitmap,处理ScaleType
      *
-     * @param canvas
      * @param drawable
-     * @param matrix
      * @param scaleType
      * @param bmpW      图片宽
      * @param bmpH      图片高
      * @param w         控件宽
      * @param h         控件高
+     * @return
      */
-    private void drawBitmapSrc(Canvas canvas, Drawable drawable, Matrix matrix, ImageView.ScaleType scaleType, int bmpW, int bmpH, int w, int h) {
+    private Bitmap getBitmapFromDrawable(Drawable drawable, ImageView.ScaleType scaleType, int bmpW, int bmpH, int w, int h) {
+        Matrix matrix = mView.getMatrix();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            matrix = new Matrix();
+            matrix.set(mView.getMatrix());
+        }
 
         /**
          * 支持padding 考虑边框宽度
@@ -347,11 +351,10 @@ public class RImageViewHelper {
                 break;
         }
 
-        viewCanvas.concat(matrix);//设置变化矩阵
+        if (matrix != null) viewCanvas.concat(matrix);//设置变化矩阵
         drawable.draw(viewCanvas);//绘制drawable
-        canvas.drawBitmap(viewBitmap, 0, 0, mBitmapPaint);
+        return viewBitmap;
     }
-
 
     private static Matrix.ScaleToFit scaleTypeToScaleToFit(ImageView.ScaleType st) {
         /**
@@ -365,6 +368,7 @@ public class RImageViewHelper {
             case FIT_END:
                 return Matrix.ScaleToFit.END;
             case FIT_CENTER:
+                return Matrix.ScaleToFit.CENTER;
             default:
                 return Matrix.ScaleToFit.CENTER;
         }
@@ -383,7 +387,7 @@ public class RImageViewHelper {
             if (mIsCircle) {
                 float borderRadiusX = (mBorderRect.width() - mBorderWidth) / 2;
                 float borderRadiusY = (mBorderRect.height() - mBorderWidth) / 2;
-                canvas.drawCircle(getWidth() / 2, getHeight() / 2, Math.min(borderRadiusX, borderRadiusY), mBorderPaint);
+                canvas.drawCircle(getWidth() / 2f, getHeight() / 2f, Math.min(borderRadiusX, borderRadiusY), mBorderPaint);
             } else {
                 updateCornerBorderRadii();
                 Path path = new Path();
@@ -394,71 +398,16 @@ public class RImageViewHelper {
     }
 
     /**
-     * 获取目标资源bitmap(形状)
-     *
-     * @param w
-     * @param h
-     * @return
-     */
-    private Bitmap makeDst(int w, int h) {
-
-        updateCornerBitmapRadii();
-        updateDrawableAndBorderRect();
-
-        if (mIsCircle) {//圆形
-            return makeDstCircle(w, h, mDrawableRect);
-        } else {//圆角
-            return makeDstRound(w, h, mDrawableRect, mCornerBitmapRadii);
-        }
-    }
-
-    /**
-     * 获取目标资源bitmap-圆形
-     *
-     * @param w
-     * @param h
-     * @param rect
-     * @return
-     */
-    private Bitmap makeDstCircle(int w, int h, RectF rect) {
-        Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);//抗锯齿
-        canvas.drawCircle(getWidth() / 2, getHeight() / 2, Math.min(rect.width() / 2, rect.width() / 2), paint);
-        return bitmap;
-    }
-
-    /**
-     * 获取目标资源bitmap-圆角
-     *
-     * @param w
-     * @param h
-     * @param rect
-     * @param radii
-     * @return
-     */
-    private Bitmap makeDstRound(int w, int h, RectF rect, float[] radii) {
-        Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);//抗锯齿
-        Path path = new Path();
-        path.addRoundRect(rect, radii, Path.Direction.CW);
-        canvas.drawPath(path, paint);
-        return bitmap;
-    }
-
-    /**
      * 更新drawable和border Rect
      */
     private void updateDrawableAndBorderRect() {
 
-        float half = mBorderWidth / 2;
+        float half = mBorderWidth / 2f;
         if (mIsCircle) {//圆形
-
-            mBorderRect.set(0, 0, getWidth(), getHeight());//边框Rect圆形
-            mDrawableRect.set(mBorderWidth, mBorderWidth, mBorderRect.width() - mBorderWidth, mBorderRect.height() - mBorderWidth);//drawableRect
+            float minRect = Math.min(getWidth(), getHeight());
+            mBorderRect.set(half, half, getWidth() - half, getHeight() - half);//边框Rect圆角
+            mDrawableRect.set(mBorderRect.left + half, mBorderRect.top + half, minRect - half, minRect - half);//drawableRect
         } else {//圆角
-
             mBorderRect.set(half, half, getWidth() - half, getHeight() - half);//边框Rect圆角
             mDrawableRect.set(mBorderRect.left + half, mBorderRect.top + half, mBorderRect.right - half, mBorderRect.bottom - half);//drawableRect
         }
@@ -533,7 +482,16 @@ public class RImageViewHelper {
 
     public RImageViewHelper setIconNormal(Drawable icon) {
         this.mIconNormal = icon;
-        setup();
+        if (mIconPressed == null) {
+            mIconPressed = mIconNormal;
+        }
+        if (mIconUnable == null) {
+            mIconUnable = mIconNormal;
+        }
+        if (mIconSelected == null) {
+            mIconSelected = mIconNormal;
+        }
+        setIcon();
         return this;
     }
 
@@ -543,7 +501,7 @@ public class RImageViewHelper {
 
     public RImageViewHelper setIconPressed(Drawable icon) {
         this.mIconPressed = icon;
-        setup();
+        setIcon();
         return this;
     }
 
@@ -553,12 +511,22 @@ public class RImageViewHelper {
 
     public RImageViewHelper setIconUnable(Drawable icon) {
         this.mIconUnable = icon;
-        setup();
+        setIcon();
         return this;
     }
 
     public Drawable getIconUnable() {
         return mIconUnable;
+    }
+
+    public RImageViewHelper setIconSelected(Drawable icon) {
+        this.mIconSelected = icon;
+        setIcon();
+        return this;
+    }
+
+    public Drawable getIconSelected() {
+        return mIconSelected;
     }
 
     private void setIcon() {
